@@ -15,6 +15,7 @@ std::vector<std::wstring> g_vecImageFileNames;
 std::vector<std::wstring> g_vecSoundFileNames;
 HINSTANCE g_hInstance;
 bool g_bIsFileLoaded = false;
+std::vector<HBITMAP> g_myAss;
 
 bool ChooseImageFilesToLoad(HWND _hwnd)
 {
@@ -169,6 +170,20 @@ LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _uiMsg, WPARAM _wparam, LPARAM _lpa
 		_hWindowDC = BeginPaint(_hwnd, &ps);
 		//Do all our painting here
 
+
+		//Do all our painting here
+		for (int i = 0; i < g_myAss.size(); ++i)
+		{
+			HDC _oldDC = ::CreateCompatibleDC(_hWindowDC);
+			SelectObject(_oldDC, g_myAss[i]);
+			BitBlt(_hWindowDC, i * 256, 0, 256, 256, _oldDC, 0, 0, SRCCOPY);
+			DeleteObject(_oldDC);
+		}
+
+
+
+
+
 		EndPaint(_hwnd, &ps);
 		return (0);
 	}
@@ -183,7 +198,23 @@ LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _uiMsg, WPARAM _wparam, LPARAM _lpa
 		{
 			if (ChooseImageFilesToLoad(_hwnd))
 			{
+				// Vector of threads
+				// Make vector of bitmaps
+				// Initalise threads so that they start the bitmap thing
+				// Load bitmap into image vector - Done in threads
+				// Clear vectors
+
+
 				//Write code here to create multiple threads to load image files in parallel
+				for (int i = 0; i < g_vecImageFileNames.size(); ++i)
+				{
+					g_myAss.push_back((HBITMAP)LoadImage(NULL, g_vecImageFileNames[i].c_str(), IMAGE_BITMAP, 256, 256, LR_LOADFROMFILE));
+				}
+
+				g_vecImageFileNames.clear();
+
+				InvalidateRect(_hwnd, NULL, true);
+				UpdateWindow(_hwnd);
 			}
 			else
 			{
