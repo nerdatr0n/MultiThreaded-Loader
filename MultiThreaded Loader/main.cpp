@@ -3,6 +3,12 @@
 #include <vector>
 #include <string>
 #include "resource.h"
+#include <mmsystem.h>
+#include <thread>
+#include <functional>
+#include <algorithm>
+#include <mutex>
+
 
 #define WINDOW_CLASS_NAME L"MultiThreaded Loader Tool"
 const unsigned int _kuiWINDOWWIDTH = 1200;
@@ -15,7 +21,28 @@ std::vector<std::wstring> g_vecImageFileNames;
 std::vector<std::wstring> g_vecSoundFileNames;
 HINSTANCE g_hInstance;
 bool g_bIsFileLoaded = false;
-std::vector<HBITMAP> g_myAss;
+int g_iCount = 0;
+std::vector<HBITMAP> g_vecBitMap;
+std::mutex g_Guard;
+
+void LoadImagesThread()
+{	
+	g_Guard.lock();
+	int iMyNumber = g_iCount;
+	g_iCount++;
+	g_Guard.unlock();
+	g_vecBitMap.push_back((HBITMAP)LoadImage(NULL, g_vecImageFileNames[iMyNumber].c_str(), IMAGE_BITMAP, 256, 256, LR_LOADFROMFILE));
+
+}
+
+void PlaySoundsThread()
+{
+	g_Guard.lock();
+	int iMyNumber = g_iCount;
+	g_iCount++;
+	g_Guard.unlock();
+	PlaySound(g_vecSoundFileNames[iMyNumber].c_str(), NULL, SND_SYNC);
+}
 
 bool ChooseImageFilesToLoad(HWND _hwnd)
 {
@@ -172,10 +199,10 @@ LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _uiMsg, WPARAM _wparam, LPARAM _lpa
 
 
 		//Do all our painting here
-		for (int i = 0; i < g_myAss.size(); ++i)
+		for (int i = 0; i < g_vecBitMap.size(); ++i)
 		{
 			HDC _oldDC = ::CreateCompatibleDC(_hWindowDC);
-			SelectObject(_oldDC, g_myAss[i]);
+			SelectObject(_oldDC, g_vecBitMap[i]);
 			BitBlt(_hWindowDC, i * 256, 0, 256, 256, _oldDC, 0, 0, SRCCOPY);
 			DeleteObject(_oldDC);
 		}
@@ -198,21 +225,19 @@ LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _uiMsg, WPARAM _wparam, LPARAM _lpa
 		{
 			if (ChooseImageFilesToLoad(_hwnd))
 			{
-				// Vector of threads
-				// Make vector of bitmaps
-				// Initalise threads so that they start the bitmap thing
-				// Load bitmap into image vector - Done in threads
-				// Clear vectors
+				
+				std::vector<std::thread> vecThreads;
 
-
-				//Write code here to create multiple threads to load image files in parallel
 				for (int i = 0; i < g_vecImageFileNames.size(); ++i)
 				{
-					g_myAss.push_back((HBITMAP)LoadImage(NULL, g_vecImageFileNames[i].c_str(), IMAGE_BITMAP, 256, 256, LR_LOADFROMFILE));
+					
+					vecThreads.push_back(std::thread(LoadImagesThread));
+					
 				}
+				for_each(vecThreads.begin(), vecThreads.end(), mem_fn(&std::thread::join));
 
 				g_vecImageFileNames.clear();
-
+				g_iCount = 0;
 				InvalidateRect(_hwnd, NULL, true);
 				UpdateWindow(_hwnd);
 			}
@@ -228,7 +253,20 @@ LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _uiMsg, WPARAM _wparam, LPARAM _lpa
 		{
 			if (ChooseSoundFilesToLoad(_hwnd))
 			{
-				//Write code here to create multiple threads to load sound files in parallel
+
+				std::vector<std::thread> vecThreads;
+
+
+				for (int i = 0; i < g_vecSoundFileNames.size(); ++i)
+				{
+					vecThreads.push_back(std::thread(PlaySoundsThread));
+				}
+				
+
+				
+				for_each(vecThreads.begin(), vecThreads.end(), mem_fn(&std::thread::join));
+				g_vecSoundFileNames.clear();
+				g_iCount = 0;
 			}
 			else
 			{
